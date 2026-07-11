@@ -34,6 +34,7 @@
   }
   .field { margin-bottom: 14px; }
   .key-row { display: flex; gap: 6px; }
+  select,
   input[type="password"],
   input[type="text"],
   textarea {
@@ -46,7 +47,7 @@
     resize: vertical;
     outline: none;
   }
-  input:focus, textarea:focus { border-color: #4f46e5; }
+  select:focus, input:focus, textarea:focus { border-color: #4f46e5; }
   textarea { min-height: 60px; }
   .icon-btn {
     flex: 0 0 auto;
@@ -102,12 +103,19 @@
   </header>
   <main>
     <div class="field">
-      <label for="apiKey">OpenAI API Key</label>
+      <label for="provider">AI Provider</label>
+      <select id="provider">
+        <option value="openai">OpenAI (GPT)</option>
+        <option value="gemini">Google Gemini — no credit card required</option>
+      </select>
+    </div>
+    <div class="field">
+      <label for="apiKey" id="apiKeyLabel">OpenAI API Key</label>
       <div class="key-row">
         <input type="password" id="apiKey" placeholder="sk-..." autocomplete="off" />
         <button class="icon-btn" id="toggleKey" type="button">Show</button>
       </div>
-      <div class="hint">Stored only on this device. Get a key at <a href="https://platform.openai.com/api-keys" target="_blank" rel="noopener">platform.openai.com</a>.</div>
+      <div class="hint" id="apiKeyHint">Stored only on this device. Get a key at <a href="https://platform.openai.com/api-keys" target="_blank" rel="noopener">platform.openai.com</a>.</div>
     </div>
     <div class="field">
       <label for="customStyle">Custom Style (used by "My Style")</label>

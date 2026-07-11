@@ -50,20 +50,14 @@ const STYLE_PROMPTS = {
 
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === "callLLM") {
-    callOpenAI(request.text, request.style)
+    callLLM(request.text, request.style)
       .then((result) => sendResponse({ ok: true, text: result }))
       .catch((err) => sendResponse({ ok: false, error: err.message }));
     return true;
   }
 });
 
-async function callOpenAI(text, style) {
-  const { apiKey, customStyle } = await chrome.storage.local.get(["apiKey", "customStyle"]);
-
-  if (!apiKey) {
-    throw new Error("No API key set. Click the Refine icon to add your OpenAI API key.");
-  }
-
+function buildSystemPrompt(style, customStyle) {
   let instruction = STYLE_PROMPTS[style];
   if (style === "custom") {
     if (!customStyle) {
@@ -71,7 +65,37 @@ async function callOpenAI(text, style) {
     }
     instruction = `Rewrite the following text according to this style guide: "${customStyle}". Preserve the original meaning.`;
   }
+  return `${instruction} Reply with only the rewritten text and nothing else — no quotes, no explanations, no preamble.`;
+}
 
+async function callLLM(text, style) {
+  const { provider, openaiKey, geminiKey, apiKey, customStyle } = await chrome.storage.local.get([
+    "provider",
+    "openaiKey",
+    "geminiKey",
+    "apiKey",
+    "customStyle"
+  ]);
+
+  const activeProvider = provider || "openai";
+  const systemPrompt = buildSystemPrompt(style, customStyle);
+
+  if (activeProvider === "gemini") {
+    if (!geminiKey) {
+      throw new Error("No Gemini API key set. Click the Refine icon to add one.");
+    }
+    return callGemini(text, systemPrompt, geminiKey);
+  }
+
+  // "apiKey" is the legacy single-provider field from before Gemini support.
+  const key = openaiKey || apiKey;
+  if (!key) {
+    throw new Error("No OpenAI API key set. Click the Refine icon to add one.");
+  }
+  return callOpenAI(text, systemPrompt, key);
+}
+
+async function callOpenAI(text, systemPrompt, apiKey) {
   const response = await fetch("https://api.openai.com/v1/chat/completions", {
     method: "POST",
     headers: {
@@ -81,10 +105,7 @@ async function callOpenAI(text, style) {
     body: JSON.stringify({
       model: "gpt-4o-mini",
       messages: [
-        {
-          role: "system",
-          content: `${instruction} Reply with only the rewritten text and nothing else — no quotes, no explanations, no preamble.`
-        },
+        { role: "system", content: systemPrompt },
         { role: "user", content: text }
       ],
       temperature: 0.7
@@ -93,7 +114,7 @@ async function callOpenAI(text, style) {
 
   if (!response.ok) {
     if (response.status === 401) {
-      throw new Error("Invalid API key.");
+      throw new Error("Invalid OpenAI API key.");
     }
     if (response.status === 429) {
       throw new Error("Rate limited or quota exceeded.");
@@ -105,6 +126,38 @@ async function callOpenAI(text, style) {
   const result = data.choices?.[0]?.message?.content?.trim();
   if (!result) {
     throw new Error("Empty response from OpenAI.");
+  }
+  return result;
+}
+
+async function callGemini(text, systemPrompt, apiKey) {
+  const response = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${encodeURIComponent(apiKey)}`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        systemInstruction: { parts: [{ text: systemPrompt }] },
+        contents: [{ parts: [{ text }] }],
+        generationConfig: { temperature: 0.7 }
+      })
+    }
+  );
+
+  if (!response.ok) {
+    if (response.status === 400 || response.status === 403) {
+      throw new Error("Invalid Gemini API key.");
+    }
+    if (response.status === 429) {
+      throw new Error("Rate limited or quota exceeded.");
+    }
+    throw new Error(`Gemini request failed (${response.status}).`);
+  }
+
+  const data = await response.json();
+  const result = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+  if (!result) {
+    throw new Error("Empty response from Gemini.");
   }
   return result;
 }

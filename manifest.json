@@ -4,7 +4,10 @@
   "version": "1.0.0",
   "description": "Select text anywhere and make it professional with AI.",
   "permissions": ["contextMenus", "storage", "activeTab"],
-  "host_permissions": ["https://api.openai.com/*"],
+  "host_permissions": [
+    "https://api.openai.com/*",
+    "https://generativelanguage.googleapis.com/*"
+  ],
   "background": {
     "service_worker": "background.js"
   },
