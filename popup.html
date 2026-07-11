@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Refine</title>
+<style>
+  :root {
+    color-scheme: light;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    width: 320px;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    color: #1f2330;
+    background: #ffffff;
+  }
+  header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 14px 16px 10px;
+    border-bottom: 1px solid #eef0f4;
+  }
+  header img { width: 22px; height: 22px; border-radius: 6px; }
+  header h1 { font-size: 15px; margin: 0; font-weight: 600; }
+  main { padding: 14px 16px 16px; }
+  label {
+    display: block;
+    font-size: 12px;
+    font-weight: 600;
+    color: #4b5162;
+    margin-bottom: 6px;
+  }
+  .field { margin-bottom: 14px; }
+  .key-row { display: flex; gap: 6px; }
+  input[type="password"],
+  input[type="text"],
+  textarea {
+    width: 100%;
+    font-size: 13px;
+    padding: 8px 10px;
+    border: 1px solid #d9dce3;
+    border-radius: 8px;
+    font-family: inherit;
+    resize: vertical;
+    outline: none;
+  }
+  input:focus, textarea:focus { border-color: #4f46e5; }
+  textarea { min-height: 60px; }
+  .icon-btn {
+    flex: 0 0 auto;
+    border: 1px solid #d9dce3;
+    background: #f7f8fa;
+    border-radius: 8px;
+    padding: 0 10px;
+    cursor: pointer;
+    font-size: 12px;
+  }
+  .hint {
+    font-size: 11px;
+    color: #8a90a0;
+    margin-top: 5px;
+    line-height: 1.4;
+  }
+  .hint a { color: #4f46e5; }
+  button.primary {
+    width: 100%;
+    background: #4f46e5;
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    padding: 9px 0;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  button.primary:hover { background: #4338ca; }
+  #status {
+    margin-top: 10px;
+    font-size: 12px;
+    text-align: center;
+    min-height: 16px;
+  }
+  #status.ok { color: #1a7f37; }
+  #status.err { color: #c62828; }
+  .howto {
+    margin-top: 16px;
+    padding-top: 12px;
+    border-top: 1px solid #eef0f4;
+    font-size: 11.5px;
+    color: #6b7280;
+    line-height: 1.5;
+  }
+  .howto b { color: #1f2330; }
+</style>
+</head>
+<body>
+  <header>
+    <img src="icons/icon32.png" alt="" />
+    <h1>Refine</h1>
+  </header>
+  <main>
+    <div class="field">
+      <label for="apiKey">OpenAI API Key</label>
+      <div class="key-row">
+        <input type="password" id="apiKey" placeholder="sk-..." autocomplete="off" />
+        <button class="icon-btn" id="toggleKey" type="button">Show</button>
+      </div>
+      <div class="hint">Stored only on this device. Get a key at <a href="https://platform.openai.com/api-keys" target="_blank" rel="noopener">platform.openai.com</a>.</div>
+    </div>
+    <div class="field">
+      <label for="customStyle">Custom Style (used by "My Style")</label>
+      <textarea id="customStyle" placeholder="e.g. Friendly but direct, short sentences, no jargon."></textarea>
+    </div>
+    <button class="primary" id="save">Save</button>
+    <div id="status"></div>
+    <div class="howto">
+      <b>How to use:</b> Select any text on a page, then right-click &rarr; <b>Refine with AI</b>, or press <b>Ctrl+Shift+R</b> (Professional).
+    </div>
+  </main>
+  <script src="popup.js"></script>
+</body>
+</html>
