@@ -99,6 +99,10 @@ function showListeningBadge(rect, interimText) {
     hideBadge();
     el = document.createElement("div");
     el.className = "badge listening";
+    el.style.pointerEvents = "auto";
+    el.style.cursor = "pointer";
+    el.title = "Click to stop dictation";
+    el.addEventListener("click", stopDictation);
     el.appendChild(buildDots());
     const label = document.createElement("span");
     label.textContent = "Listening";
@@ -212,18 +216,37 @@ function replaceText(target, newText) {
 
 let dictationState = null;
 
-function insertDictatedChunk(chunk) {
-  if (!chunk) return;
+function needsLeadingSpace(prevChar, chunk) {
+  if (!prevChar || /\s/.test(prevChar)) return false;
+  return !/^[\s.,!?;:)'"’”]/.test(chunk);
+}
+
+function getCharBeforeRange(range) {
+  const container = range.startContainer;
+  const offset = range.startOffset;
+  if (container.nodeType === Node.TEXT_NODE) {
+    return offset > 0 ? container.textContent.charAt(offset - 1) : "";
+  }
+  const prev = container.childNodes[offset - 1];
+  return prev && prev.nodeType === Node.TEXT_NODE ? prev.textContent.slice(-1) : "";
+}
+
+function insertDictatedChunk(rawChunk) {
+  if (!rawChunk) return;
   const state = dictationState;
   if (state.type === "field") {
     const el = state.el;
     el.focus();
+    const prevChar = state.pos > 0 ? el.value.charAt(state.pos - 1) : "";
+    const chunk = needsLeadingSpace(prevChar, rawChunk) ? ` ${rawChunk}` : rawChunk;
     el.setRangeText(chunk, state.pos, state.pos, "end");
     state.pos = el.selectionStart;
     el.dispatchEvent(new Event("input", { bubbles: true }));
     el.dispatchEvent(new Event("change", { bubbles: true }));
   } else {
     const range = state.range;
+    const prevChar = getCharBeforeRange(range);
+    const chunk = needsLeadingSpace(prevChar, rawChunk) ? ` ${rawChunk}` : rawChunk;
     const node = document.createTextNode(chunk);
     range.insertNode(node);
     range.setStartAfter(node);
