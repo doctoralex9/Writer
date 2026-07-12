@@ -2,7 +2,7 @@ let badgeHost = null;
 let currentBadgeEl = null;
 
 function getBadgeHost() {
-  if (badgeHost && document.body.contains(badgeHost)) return badgeHost;
+  if (badgeHost && document.documentElement.contains(badgeHost)) return badgeHost;
   badgeHost = document.createElement("div");
   badgeHost.style.position = "fixed";
   badgeHost.style.top = "0";
@@ -221,6 +221,11 @@ function needsLeadingSpace(prevChar, chunk) {
   return !/^[\s.,!?;:)'"’”]/.test(chunk);
 }
 
+function needsTrailingSpace(chunk, nextChar) {
+  if (!nextChar || /\s/.test(nextChar)) return false;
+  return !/[.,!?;:)'"’”]/.test(nextChar) && !/[\s]$/.test(chunk);
+}
+
 function getCharBeforeRange(range) {
   const container = range.startContainer;
   const offset = range.startOffset;
@@ -231,6 +236,17 @@ function getCharBeforeRange(range) {
   return prev && prev.nodeType === Node.TEXT_NODE ? prev.textContent.slice(-1) : "";
 }
 
+function getCharAfterRange(range) {
+  const container = range.startContainer;
+  const offset = range.startOffset;
+  if (container.nodeType === Node.TEXT_NODE) {
+    return offset < container.textContent.length ? container.textContent.charAt(offset) : "";
+  }
+  const next = container.childNodes[offset];
+  if (!next) return "";
+  return next.nodeType === Node.TEXT_NODE ? next.textContent.charAt(0) : (next.textContent || "").charAt(0);
+}
+
 function insertDictatedChunk(rawChunk) {
   if (!rawChunk) return;
   const state = dictationState;
@@ -238,7 +254,10 @@ function insertDictatedChunk(rawChunk) {
     const el = state.el;
     el.focus();
     const prevChar = state.pos > 0 ? el.value.charAt(state.pos - 1) : "";
-    const chunk = needsLeadingSpace(prevChar, rawChunk) ? ` ${rawChunk}` : rawChunk;
+    const nextChar = el.value.charAt(state.pos);
+    let chunk = rawChunk;
+    if (needsLeadingSpace(prevChar, chunk)) chunk = ` ${chunk}`;
+    if (needsTrailingSpace(chunk, nextChar)) chunk = `${chunk} `;
     el.setRangeText(chunk, state.pos, state.pos, "end");
     state.pos = el.selectionStart;
     el.dispatchEvent(new Event("input", { bubbles: true }));
@@ -246,7 +265,10 @@ function insertDictatedChunk(rawChunk) {
   } else {
     const range = state.range;
     const prevChar = getCharBeforeRange(range);
-    const chunk = needsLeadingSpace(prevChar, rawChunk) ? ` ${rawChunk}` : rawChunk;
+    const nextChar = getCharAfterRange(range);
+    let chunk = rawChunk;
+    if (needsLeadingSpace(prevChar, chunk)) chunk = ` ${chunk}`;
+    if (needsTrailingSpace(chunk, nextChar)) chunk = `${chunk} `;
     const node = document.createTextNode(chunk);
     range.insertNode(node);
     range.setStartAfter(node);

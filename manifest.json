@@ -40,8 +40,8 @@
     },
     "dictate-toggle": {
       "suggested_key": {
-        "default": "Ctrl+Shift+D",
-        "mac": "Command+Shift+D"
+        "default": "Alt+Shift+D",
+        "mac": "Alt+Shift+D"
       },
       "description": "Start/stop voice dictation"
     }
