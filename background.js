@@ -5,6 +5,11 @@ const STYLE_MENU_ITEMS = [
   { id: "custom", title: "My Style" }
 ];
 
+const DICTATE_STYLE_ITEMS = [
+  { id: "raw", title: "Raw (no rewrite)" },
+  ...STYLE_MENU_ITEMS
+];
+
 chrome.runtime.onInstalled.addListener(() => {
   chrome.contextMenus.create({
     id: "refine-parent",
@@ -20,16 +25,26 @@ chrome.runtime.onInstalled.addListener(() => {
     });
   }
   chrome.contextMenus.create({
-    id: "texter-dictate",
-    title: "Dictate here",
+    id: "dictate-parent",
+    title: "Dictate with Texter",
     contexts: ["editable"]
   });
+  for (const item of DICTATE_STYLE_ITEMS) {
+    chrome.contextMenus.create({
+      id: `dictate-${item.id}`,
+      parentId: "dictate-parent",
+      title: item.title,
+      contexts: ["editable"]
+    });
+  }
 });
 
 chrome.contextMenus.onClicked.addListener((info, tab) => {
   if (!tab || !tab.id) return;
-  if (info.menuItemId === "texter-dictate") {
-    chrome.tabs.sendMessage(tab.id, { action: "dictate-toggle" });
+  if (info.menuItemId.startsWith("dictate-")) {
+    const style = info.menuItemId.slice("dictate-".length);
+    chrome.storage.local.set({ lastDictationStyle: style });
+    chrome.tabs.sendMessage(tab.id, { action: "dictate-toggle", style });
     return;
   }
   const style = info.menuItemId.startsWith("refine-")
@@ -49,10 +64,12 @@ chrome.commands.onCommand.addListener((command) => {
     });
   }
   if (command === "dictate-toggle") {
-    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-      if (tabs[0] && tabs[0].id) {
-        chrome.tabs.sendMessage(tabs[0].id, { action: "dictate-toggle" });
-      }
+    chrome.storage.local.get(["lastDictationStyle"], ({ lastDictationStyle }) => {
+      chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+        if (tabs[0] && tabs[0].id) {
+          chrome.tabs.sendMessage(tabs[0].id, { action: "dictate-toggle", style: lastDictationStyle || "raw" });
+        }
+      });
     });
   }
 });

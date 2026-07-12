@@ -169,9 +169,14 @@ function getDictationTarget() {
   const active = document.activeElement;
 
   if (active && (active.tagName === "INPUT" || active.tagName === "TEXTAREA")) {
-    const pos = active.selectionStart;
-    if (typeof pos === "number") {
-      return { type: "field", el: active, pos };
+    const start = active.selectionStart;
+    const end = active.selectionEnd;
+    if (typeof start === "number" && typeof end === "number") {
+      if (end > start) {
+        active.setRangeText("", start, end, "end");
+        active.dispatchEvent(new Event("input", { bubbles: true }));
+      }
+      return { type: "field", el: active, pos: active.selectionStart };
     }
   }
 
@@ -182,7 +187,12 @@ function getDictationTarget() {
     if (node.nodeType === Node.TEXT_NODE) node = node.parentElement;
     const editableRoot = node && node.closest ? node.closest('[contenteditable="true"], [contenteditable=""]') : null;
     if (editableRoot) {
-      range.collapse(false);
+      if (!range.collapsed) {
+        range.deleteContents();
+        editableRoot.dispatchEvent(new InputEvent("input", { bubbles: true }));
+      } else {
+        range.collapse(false);
+      }
       return { type: "contenteditable", root: editableRoot, range };
     }
   }
@@ -286,18 +296,72 @@ function onDictationEscape(e) {
 
 function stopDictation() {
   if (!dictationState) return;
-  const state = dictationState;
-  dictationState = null;
   document.removeEventListener("keydown", onDictationEscape, true);
+  if (dictationState.style && dictationState.style !== "raw") {
+    showBadge(getSelectionRect(dictationState), "Finishing up…", "loading");
+  } else {
+    hideBadge();
+  }
   try {
-    state.recognition.stop();
+    dictationState.recognition.stop();
   } catch (e) {
     // already stopped
   }
-  hideBadge();
 }
 
-function startDictation() {
+async function finalizeDictation(state) {
+  if (!state.style || state.style === "raw") {
+    hideBadge();
+    return;
+  }
+
+  let rawText;
+  let applyRewrite;
+
+  if (state.type === "field") {
+    rawText = state.el.value.substring(state.startPos, state.pos);
+    applyRewrite = (newText) => {
+      state.el.focus();
+      state.el.setRangeText(newText, state.startPos, state.pos, "end");
+      state.el.dispatchEvent(new Event("input", { bubbles: true }));
+      state.el.dispatchEvent(new Event("change", { bubbles: true }));
+    };
+  } else {
+    const finalRange = document.createRange();
+    finalRange.setStart(state.startRange.startContainer, state.startRange.startOffset);
+    finalRange.setEnd(state.range.startContainer, state.range.startOffset);
+    rawText = finalRange.toString();
+    applyRewrite = (newText) => {
+      finalRange.deleteContents();
+      finalRange.insertNode(document.createTextNode(newText));
+      state.root.dispatchEvent(new InputEvent("input", { bubbles: true }));
+    };
+  }
+
+  if (!rawText.trim()) {
+    hideBadge();
+    return;
+  }
+
+  const rect = getSelectionRect(state);
+  showBadge(rect, "Applying style…", "loading");
+
+  chrome.runtime.sendMessage(
+    { action: "callLLM", text: rawText, style: state.style },
+    (response) => {
+      hideBadge();
+      if (!response || !response.ok) {
+        const message = response?.error || "Couldn't apply style — kept raw dictation.";
+        showBadge(rect, message, "error");
+        setTimeout(hideBadge, 3500);
+        return;
+      }
+      applyRewrite(response.text);
+    }
+  );
+}
+
+function startDictation(style) {
   if (dictationState) {
     stopDictation();
     return;
@@ -319,18 +383,23 @@ function startDictation() {
   }
 
   chrome.storage.local.get(["dictationLang"], ({ dictationLang }) => {
-    beginDictation(target, SpeechRecognitionImpl, dictationLang);
+    beginDictation(target, SpeechRecognitionImpl, dictationLang, style || "raw");
   });
 }
 
-function beginDictation(target, SpeechRecognitionImpl, dictationLang) {
+function beginDictation(target, SpeechRecognitionImpl, dictationLang, style) {
   const rect = getSelectionRect(target);
   const recognition = new SpeechRecognitionImpl();
   recognition.continuous = true;
   recognition.interimResults = true;
   recognition.lang = (dictationLang && dictationLang !== "auto") ? dictationLang : (navigator.language || "en-US");
 
-  dictationState = { ...target, recognition };
+  dictationState = { ...target, recognition, style };
+  if (target.type === "contenteditable") {
+    dictationState.startRange = target.range.cloneRange();
+  } else {
+    dictationState.startPos = target.pos;
+  }
 
   recognition.onresult = (event) => {
     if (!dictationState || dictationState.recognition !== recognition) return;
@@ -348,7 +417,8 @@ function beginDictation(target, SpeechRecognitionImpl, dictationLang) {
 
   recognition.onerror = (event) => {
     if (!dictationState || dictationState.recognition !== recognition) return;
-    stopDictation();
+    dictationState = null;
+    document.removeEventListener("keydown", onDictationEscape, true);
     const messages = {
       "not-allowed": "Microphone permission denied.",
       "no-speech": "No speech detected."
@@ -359,9 +429,10 @@ function beginDictation(target, SpeechRecognitionImpl, dictationLang) {
 
   recognition.onend = () => {
     if (dictationState && dictationState.recognition === recognition) {
+      const state = dictationState;
       dictationState = null;
       document.removeEventListener("keydown", onDictationEscape, true);
-      hideBadge();
+      finalizeDictation(state);
     }
   };
 
@@ -372,7 +443,7 @@ function beginDictation(target, SpeechRecognitionImpl, dictationLang) {
 
 chrome.runtime.onMessage.addListener((request) => {
   if (request.action === "dictate-toggle") {
-    startDictation();
+    startDictation(request.style);
     return;
   }
   if (request.action !== "refine") return;
