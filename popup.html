@@ -36,7 +36,8 @@
   .key-row { display: flex; gap: 6px; }
   input[type="password"],
   input[type="text"],
-  textarea {
+  textarea,
+  select {
     width: 100%;
     font-size: 13px;
     padding: 8px 10px;
@@ -45,8 +46,10 @@
     font-family: inherit;
     resize: vertical;
     outline: none;
+    background: #fff;
+    color: #1f2330;
   }
-  input:focus, textarea:focus { border-color: #4f46e5; }
+  input:focus, textarea:focus, select:focus { border-color: #4f46e5; }
   textarea { min-height: 60px; }
   .icon-btn {
     flex: 0 0 auto;
@@ -113,12 +116,26 @@
       <label for="customStyle">Custom Style (used by "My Style")</label>
       <textarea id="customStyle" placeholder="e.g. Friendly but direct, short sentences, no jargon."></textarea>
     </div>
+    <div class="field">
+      <label for="dictationLang">Dictation Language</label>
+      <select id="dictationLang">
+        <option value="auto">Auto (match browser)</option>
+        <option value="en-US">English</option>
+        <option value="el-GR">Greek</option>
+        <option value="es-ES">Spanish</option>
+        <option value="fr-FR">French</option>
+        <option value="de-DE">German</option>
+        <option value="it-IT">Italian</option>
+        <option value="pt-PT">Portuguese</option>
+      </select>
+      <div class="hint">Forces voice dictation to listen for this language, regardless of your browser's setting.</div>
+    </div>
     <button class="primary" id="save">Save</button>
     <div id="status"></div>
     <div class="howto">
       <b>How to use:</b> Select any text on a page, then right-click &rarr; <b>Refine with Texter</b>, or press <b>Ctrl+Shift+R</b> (Professional).
       <br /><br />
-      <b>Voice dictation:</b> Click into any text field, then right-click &rarr; <b>Dictate here</b>, or press <b>Ctrl+Shift+D</b> to start/stop.
+      <b>Voice dictation:</b> Click into any text field, then right-click &rarr; <b>Dictate here</b>, or press <b>Ctrl+Shift+D</b> to start/stop. Set the dictation language above if it's not matching your browser's default.
     </div>
   </main>
   <script src="popup.js"></script>

@@ -1,4 +1,5 @@
 let badgeHost = null;
+let currentBadgeEl = null;
 
 function getBadgeHost() {
   if (badgeHost && document.body.contains(badgeHost)) return badgeHost;
@@ -14,21 +15,63 @@ function getBadgeHost() {
     .badge {
       position: fixed;
       transform: translateY(-100%);
-      font: 12px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-      padding: 5px 10px;
-      border-radius: 6px;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.18);
-      white-space: nowrap;
-      max-width: 280px;
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      font: 500 12.5px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      letter-spacing: 0.1px;
+      padding: 7px 12px;
+      border-radius: 9px;
+      box-shadow: 0 6px 20px rgba(0,0,0,0.25);
       white-space: normal;
+      max-width: 300px;
     }
-    .badge.loading { background: #4f46e5; color: #fff; }
-    .badge.error { background: #c62828; color: #fff; }
-    .badge.listening { background: #1a7f37; color: #fff; }
+    .badge.loading, .badge.listening { background: #141414; color: #f5f5f5; }
+    .badge.error { background: #141414; color: #ff8a80; border: 1px solid rgba(255,138,128,0.35); }
+
+    .badge .dots { display: inline-flex; flex: 0 0 auto; gap: 3px; }
+    .badge .dots span {
+      width: 4px;
+      height: 4px;
+      border-radius: 50%;
+      background: currentColor;
+      opacity: 0.3;
+      animation: texter-pulse 1.1s ease-in-out infinite;
+    }
+    .badge .dots span:nth-child(2) { animation-delay: 0.15s; }
+    .badge .dots span:nth-child(3) { animation-delay: 0.3s; }
+    @keyframes texter-pulse {
+      0%, 80%, 100% { opacity: 0.3; transform: scale(0.85); }
+      40% { opacity: 1; transform: scale(1); }
+    }
+
+    .badge .transcript {
+      color: #a8a8a8;
+      font-weight: 400;
+    }
+    .badge .transcript.pulse-in {
+      animation: texter-fade-in 0.16s ease-out;
+    }
+    @keyframes texter-fade-in {
+      from { opacity: 0; transform: translateY(2px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
   `;
   shadow.appendChild(style);
   document.documentElement.appendChild(badgeHost);
   return badgeHost;
+}
+
+function buildDots() {
+  const dots = document.createElement("span");
+  dots.className = "dots";
+  for (let i = 0; i < 3; i++) dots.appendChild(document.createElement("span"));
+  return dots;
+}
+
+function positionBadge(el, rect) {
+  el.style.left = `${Math.max(8, rect.left)}px`;
+  el.style.top = `${Math.max(8, rect.top - 6)}px`;
 }
 
 function showBadge(rect, message, kind) {
@@ -37,14 +80,46 @@ function showBadge(rect, message, kind) {
   hideBadge();
   const el = document.createElement("div");
   el.className = `badge ${kind}`;
-  el.textContent = message;
-  el.style.left = `${Math.max(8, rect.left)}px`;
-  el.style.top = `${Math.max(8, rect.top - 6)}px`;
+  if (kind === "loading") el.appendChild(buildDots());
+  const label = document.createElement("span");
+  label.textContent = message;
+  el.appendChild(label);
+  positionBadge(el, rect);
   shadow.appendChild(el);
+  currentBadgeEl = el;
   return el;
 }
 
+function showListeningBadge(rect, interimText) {
+  const host = getBadgeHost();
+  const shadow = host.shadowRoot;
+  let el = currentBadgeEl && currentBadgeEl.classList.contains("listening") ? currentBadgeEl : null;
+
+  if (!el) {
+    hideBadge();
+    el = document.createElement("div");
+    el.className = "badge listening";
+    el.appendChild(buildDots());
+    const label = document.createElement("span");
+    label.textContent = "Listening";
+    const transcript = document.createElement("span");
+    transcript.className = "transcript";
+    el.appendChild(label);
+    el.appendChild(transcript);
+    shadow.appendChild(el);
+    currentBadgeEl = el;
+  }
+
+  positionBadge(el, rect);
+  const transcript = el.querySelector(".transcript");
+  transcript.textContent = interimText ? `"${interimText}"` : "";
+  transcript.classList.remove("pulse-in");
+  void transcript.offsetWidth;
+  transcript.classList.add("pulse-in");
+}
+
 function hideBadge() {
+  currentBadgeEl = null;
   if (badgeHost && badgeHost.shadowRoot) {
     badgeHost.shadowRoot.querySelectorAll(".badge").forEach((n) => n.remove());
   }
@@ -198,15 +273,22 @@ function startDictation() {
     return;
   }
 
+  chrome.storage.local.get(["dictationLang"], ({ dictationLang }) => {
+    beginDictation(target, SpeechRecognitionImpl, dictationLang);
+  });
+}
+
+function beginDictation(target, SpeechRecognitionImpl, dictationLang) {
   const rect = getSelectionRect(target);
   const recognition = new SpeechRecognitionImpl();
   recognition.continuous = true;
   recognition.interimResults = true;
-  recognition.lang = navigator.language || "en-US";
+  recognition.lang = (dictationLang && dictationLang !== "auto") ? dictationLang : (navigator.language || "en-US");
 
   dictationState = { ...target, recognition };
 
   recognition.onresult = (event) => {
+    if (!dictationState || dictationState.recognition !== recognition) return;
     let interim = "";
     for (let i = event.resultIndex; i < event.results.length; i++) {
       const result = event.results[i];
@@ -216,10 +298,11 @@ function startDictation() {
         interim += result[0].transcript;
       }
     }
-    showBadge(getSelectionRect(dictationState), interim ? `Listening… "${interim}"` : "Listening…", "listening");
+    showListeningBadge(getSelectionRect(dictationState), interim);
   };
 
   recognition.onerror = (event) => {
+    if (!dictationState || dictationState.recognition !== recognition) return;
     stopDictation();
     const messages = {
       "not-allowed": "Microphone permission denied.",
@@ -238,7 +321,7 @@ function startDictation() {
   };
 
   document.addEventListener("keydown", onDictationEscape, true);
-  showBadge(rect, "Listening…", "listening");
+  showListeningBadge(rect, "");
   recognition.start();
 }
 
