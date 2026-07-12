@@ -19,10 +19,19 @@ chrome.runtime.onInstalled.addListener(() => {
       contexts: ["selection"]
     });
   }
+  chrome.contextMenus.create({
+    id: "texter-dictate",
+    title: "Dictate here",
+    contexts: ["editable"]
+  });
 });
 
 chrome.contextMenus.onClicked.addListener((info, tab) => {
   if (!tab || !tab.id) return;
+  if (info.menuItemId === "texter-dictate") {
+    chrome.tabs.sendMessage(tab.id, { action: "dictate-toggle" });
+    return;
+  }
   const style = info.menuItemId.startsWith("refine-")
     ? info.menuItemId.slice("refine-".length)
     : null;
@@ -36,6 +45,13 @@ chrome.commands.onCommand.addListener((command) => {
     chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
       if (tabs[0] && tabs[0].id) {
         chrome.tabs.sendMessage(tabs[0].id, { action: "refine", style: "professional" });
+      }
+    });
+  }
+  if (command === "dictate-toggle") {
+    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+      if (tabs[0] && tabs[0].id) {
+        chrome.tabs.sendMessage(tabs[0].id, { action: "dictate-toggle" });
       }
     });
   }

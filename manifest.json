@@ -37,6 +37,13 @@
         "mac": "Command+Shift+R"
       },
       "description": "Rewrite selected text (Professional)"
+    },
+    "dictate-toggle": {
+      "suggested_key": {
+        "default": "Ctrl+Shift+D",
+        "mac": "Command+Shift+D"
+      },
+      "description": "Start/stop voice dictation"
     }
   }
 }

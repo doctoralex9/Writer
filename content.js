@@ -24,6 +24,7 @@ function getBadgeHost() {
     }
     .badge.loading { background: #4f46e5; color: #fff; }
     .badge.error { background: #c62828; color: #fff; }
+    .badge.listening { background: #1a7f37; color: #fff; }
   `;
   shadow.appendChild(style);
   document.documentElement.appendChild(badgeHost);
@@ -85,6 +86,31 @@ function getEditableTarget() {
   return null;
 }
 
+function getDictationTarget() {
+  const active = document.activeElement;
+
+  if (active && (active.tagName === "INPUT" || active.tagName === "TEXTAREA")) {
+    const pos = active.selectionStart;
+    if (typeof pos === "number") {
+      return { type: "field", el: active, pos };
+    }
+  }
+
+  const selection = window.getSelection();
+  if (selection && selection.rangeCount > 0) {
+    const range = selection.getRangeAt(0).cloneRange();
+    let node = range.commonAncestorContainer;
+    if (node.nodeType === Node.TEXT_NODE) node = node.parentElement;
+    const editableRoot = node && node.closest ? node.closest('[contenteditable="true"], [contenteditable=""]') : null;
+    if (editableRoot) {
+      range.collapse(false);
+      return { type: "contenteditable", root: editableRoot, range };
+    }
+  }
+
+  return null;
+}
+
 function getSelectionRect(target) {
   if (target.type === "field") {
     return target.el.getBoundingClientRect();
@@ -109,7 +135,118 @@ function replaceText(target, newText) {
   }
 }
 
+let dictationState = null;
+
+function insertDictatedChunk(chunk) {
+  if (!chunk) return;
+  const state = dictationState;
+  if (state.type === "field") {
+    const el = state.el;
+    el.focus();
+    el.setRangeText(chunk, state.pos, state.pos, "end");
+    state.pos = el.selectionStart;
+    el.dispatchEvent(new Event("input", { bubbles: true }));
+    el.dispatchEvent(new Event("change", { bubbles: true }));
+  } else {
+    const range = state.range;
+    const node = document.createTextNode(chunk);
+    range.insertNode(node);
+    range.setStartAfter(node);
+    range.collapse(true);
+    const selection = window.getSelection();
+    selection.removeAllRanges();
+    selection.addRange(range);
+    state.root.dispatchEvent(new InputEvent("input", { bubbles: true }));
+  }
+}
+
+function onDictationEscape(e) {
+  if (e.key === "Escape") stopDictation();
+}
+
+function stopDictation() {
+  if (!dictationState) return;
+  const state = dictationState;
+  dictationState = null;
+  document.removeEventListener("keydown", onDictationEscape, true);
+  try {
+    state.recognition.stop();
+  } catch (e) {
+    // already stopped
+  }
+  hideBadge();
+}
+
+function startDictation() {
+  if (dictationState) {
+    stopDictation();
+    return;
+  }
+
+  const SpeechRecognitionImpl = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SpeechRecognitionImpl) {
+    const rect = { left: 20, top: 60 };
+    showBadge(rect, "Voice dictation isn't supported in this browser.", "error");
+    setTimeout(hideBadge, 3500);
+    return;
+  }
+
+  const target = getDictationTarget();
+  if (!target) {
+    showBadge({ left: 20, top: 60 }, "Click into a text field first.", "error");
+    setTimeout(hideBadge, 2500);
+    return;
+  }
+
+  const rect = getSelectionRect(target);
+  const recognition = new SpeechRecognitionImpl();
+  recognition.continuous = true;
+  recognition.interimResults = true;
+  recognition.lang = navigator.language || "en-US";
+
+  dictationState = { ...target, recognition };
+
+  recognition.onresult = (event) => {
+    let interim = "";
+    for (let i = event.resultIndex; i < event.results.length; i++) {
+      const result = event.results[i];
+      if (result.isFinal) {
+        insertDictatedChunk(result[0].transcript);
+      } else {
+        interim += result[0].transcript;
+      }
+    }
+    showBadge(getSelectionRect(dictationState), interim ? `Listening… "${interim}"` : "Listening…", "listening");
+  };
+
+  recognition.onerror = (event) => {
+    stopDictation();
+    const messages = {
+      "not-allowed": "Microphone permission denied.",
+      "no-speech": "No speech detected."
+    };
+    showBadge(rect, messages[event.error] || "Voice dictation error.", "error");
+    setTimeout(hideBadge, 3000);
+  };
+
+  recognition.onend = () => {
+    if (dictationState && dictationState.recognition === recognition) {
+      dictationState = null;
+      document.removeEventListener("keydown", onDictationEscape, true);
+      hideBadge();
+    }
+  };
+
+  document.addEventListener("keydown", onDictationEscape, true);
+  showBadge(rect, "Listening…", "listening");
+  recognition.start();
+}
+
 chrome.runtime.onMessage.addListener((request) => {
+  if (request.action === "dictate-toggle") {
+    startDictation();
+    return;
+  }
   if (request.action !== "refine") return;
 
   const target = getEditableTarget();
