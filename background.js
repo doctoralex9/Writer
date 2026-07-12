@@ -145,13 +145,15 @@ async function callGemini(text, systemPrompt, apiKey) {
   );
 
   if (!response.ok) {
+    const errData = await response.json().catch(() => null);
+    const detail = errData?.error?.message;
     if (response.status === 400 || response.status === 403) {
-      throw new Error("Invalid Gemini API key.");
+      throw new Error(`Invalid Gemini API key.${detail ? " " + detail : ""}`);
     }
     if (response.status === 429) {
-      throw new Error("Rate limited or quota exceeded.");
+      throw new Error(`Rate limited or quota exceeded.${detail ? " " + detail : ""}`);
     }
-    throw new Error(`Gemini request failed (${response.status}).`);
+    throw new Error(`Gemini request failed (${response.status}).${detail ? " " + detail : ""}`);
   }
 
   const data = await response.json();

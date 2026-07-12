@@ -16,7 +16,7 @@ const PROVIDER_INFO = {
   gemini: {
     label: "Google Gemini API Key",
     placeholder: "AIza...",
-    hint: 'Stored only on this device. Get a free key (no credit card required) at <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">aistudio.google.com</a>.'
+    hint: 'Stored only on this device. Get a key at <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">aistudio.google.com</a>. Free tier availability depends on your country — some regions require adding prepay billing before use.'
   }
 };
 
