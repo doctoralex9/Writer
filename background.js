@@ -8,7 +8,7 @@ const STYLE_MENU_ITEMS = [
 chrome.runtime.onInstalled.addListener(() => {
   chrome.contextMenus.create({
     id: "refine-parent",
-    title: "Refine with AI",
+    title: "Refine with Texter",
     contexts: ["selection"]
   });
   for (const item of STYLE_MENU_ITEMS) {
@@ -61,13 +61,13 @@ async function callOpenAI(text, style) {
   const { apiKey, customStyle } = await chrome.storage.local.get(["apiKey", "customStyle"]);
 
   if (!apiKey) {
-    throw new Error("No API key set. Click the Refine icon to add your OpenAI API key.");
+    throw new Error("No API key set. Click the Texter icon to add your OpenAI API key.");
   }
 
   let instruction = STYLE_PROMPTS[style];
   if (style === "custom") {
     if (!customStyle) {
-      throw new Error("No custom style set. Click the Refine icon to add one.");
+      throw new Error("No custom style set. Click the Texter icon to add one.");
     }
     instruction = `Rewrite the following text according to this style guide: "${customStyle}". Preserve the original meaning.`;
   }

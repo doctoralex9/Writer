@@ -1,6 +1,6 @@
 {
   "manifest_version": 3,
-  "name": "Refine - AI Writing Assistant",
+  "name": "Texter - AI Writing Assistant",
   "version": "1.0.0",
   "description": "Select text anywhere and make it professional with AI.",
   "permissions": ["contextMenus", "storage", "activeTab"],
@@ -36,7 +36,7 @@
         "default": "Ctrl+Shift+R",
         "mac": "Command+Shift+R"
       },
-      "description": "Refine selected text (Professional)"
+      "description": "Rewrite selected text (Professional)"
     }
   }
 }
