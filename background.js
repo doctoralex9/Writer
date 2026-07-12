@@ -116,7 +116,7 @@ async function callOpenAI(text, style) {
       messages: [
         {
           role: "system",
-          content: `${instruction} Reply with only the rewritten text and nothing else — no quotes, no explanations, no preamble.`
+          content: `${instruction} Keep the response in the same language as the input text — never translate it. Reply with only the rewritten text and nothing else — no quotes, no explanations, no preamble.`
         },
         { role: "user", content: text }
       ],

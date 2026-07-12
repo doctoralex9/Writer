@@ -226,14 +226,21 @@ function replaceText(target, newText) {
 
 let dictationState = null;
 
+function isNoSpaceScript(ch) {
+  // CJK ideographs/kana, Hangul, Thai, and fullwidth forms don't separate words with spaces.
+  return /[　-ヿ㐀-䶿一-鿿豈-﫿가-힣฀-๿＀-￯]/.test(ch);
+}
+
 function needsLeadingSpace(prevChar, chunk) {
   if (!prevChar || /\s/.test(prevChar)) return false;
-  return !/^[\s.,!?;:)'"’”]/.test(chunk);
+  if (isNoSpaceScript(prevChar) || isNoSpaceScript(chunk.charAt(0))) return false;
+  return !/^[\s.,!?;:)'"’”،؛؟，。！？；：）」』】》〉]/.test(chunk);
 }
 
 function needsTrailingSpace(chunk, nextChar) {
   if (!nextChar || /\s/.test(nextChar)) return false;
-  return !/[.,!?;:)'"’”]/.test(nextChar) && !/[\s]$/.test(chunk);
+  if (isNoSpaceScript(nextChar) || isNoSpaceScript(chunk.charAt(chunk.length - 1))) return false;
+  return !/[.,!?;:)'"’”،؛؟，。！？；：）」』】》〉]/.test(nextChar) && !/[\s]$/.test(chunk);
 }
 
 function getCharBeforeRange(range) {
